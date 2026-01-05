@@ -40,60 +40,135 @@ if st.session_state.page == 'strategies':
     # Custom Header for Strategy Screen
     st.markdown("""
         <div style="display: flex; align-items: center; margin-bottom: 20px;">
-            <h2 style='margin: 0;'>ESTRATÉGIAS</h2>
+            <h2 style='margin: 0;'>GERENCIAR ESTRATÉGIAS</h2>
         </div>
     """, unsafe_allow_html=True)
-    
+
     if st.button("< VOLTAR", key='btn_back'):
         navigate_to('dashboard')
         st.rerun()
 
-    col_editor, col_details = st.columns([1, 1])
+    # Inicializar estado de edição
+    if 'editing_strategy' not in st.session_state:
+        st.session_state.editing_strategy = False
+    if 'editing_strategy_name' not in st.session_state:
+        st.session_state.editing_strategy_name = ""
 
-    with col_editor:
-        st.markdown("### EDITOR")
+    col_list, col_editor = st.columns([1, 1])
 
-        # Dropdown para selecionar estratégias salvas
+    # COLUNA ESQUERDA: Lista de Estratégias Salvas
+    with col_list:
+        st.markdown("### 📋 ESTRATÉGIAS SALVAS")
+
         saved_strategies = list_strategy_names()
+
         if saved_strategies:
-            selected_strategy = st.selectbox("SELECIONAR:", [""] + saved_strategies, key="select_strategy")
-            if selected_strategy:
-                loaded = get_strategy(selected_strategy)
-                if loaded:
-                    st.session_state.strategy_code = loaded['code']
-                    strategy_name = selected_strategy
+            for strategy_name in saved_strategies:
+                strategy_data = get_strategy(strategy_name)
+                is_active = st.session_state.get('active_strategy', 'Nenhuma') == strategy_name
 
-        strategy_name = st.text_input("NOME DA ESTRATÉGIA", value=st.session_state.get('current_strategy_name', "Crossover EMA + Var %"), key="strategy_name_input")
+                # Card para cada estratégia
+                card_color = "#00e676" if is_active else "#2b2b2b"
+                status_text = "✅ ATIVA" if is_active else ""
 
-        st.markdown("**ENTRAR LONG > (SINAL COMPRA)**")
-        st.markdown("**ENTRAR SHORT > (SINAL VENDA)**")
+                st.markdown(f"""
+                <div style="background:{card_color if is_active else '#2b2b2b'};
+                     border:2px solid {card_color};
+                     padding:15px; border-radius:6px; margin-bottom:10px;">
+                    <strong style="font-size:16px;">{strategy_name}</strong>
+                    <span style="color:#00e676; float:right;">{status_text}</span>
+                </div>
+                """, unsafe_allow_html=True)
 
-        # Mockup Inputs for Condition
-        c_cond1, c_cond2 = st.columns(2)
-        with c_cond1: st.selectbox("Condição", ["Crossover EMA + Var %"], disabled=True)
-        with c_cond2: st.selectbox("Sinal", ["Sinal de Compra/Venda"], disabled=True)
+                # Botões de ação
+                col_activate, col_edit, col_delete = st.columns(3)
+                with col_activate:
+                    if not is_active:
+                        if st.button("ATIVAR", key=f"activate_{strategy_name}"):
+                            st.session_state.active_strategy = strategy_name
+                            st.success(f"✅ Estratégia '{strategy_name}' ativada!")
+                            st.rerun()
+                with col_edit:
+                    if st.button("EDITAR", key=f"edit_{strategy_name}"):
+                        st.session_state.editing_strategy = True
+                        st.session_state.editing_strategy_name = strategy_name
+                        st.session_state.strategy_code = strategy_data['code']
+                        st.rerun()
+                with col_delete:
+                    if st.button("❌", key=f"delete_{strategy_name}", help="Excluir estratégia"):
+                        from strategy_manager import delete_strategy
+                        delete_strategy(strategy_name)
+                        if st.session_state.get('active_strategy') == strategy_name:
+                            st.session_state.active_strategy = "Nenhuma"
+                        st.success(f"🗑️ Estratégia '{strategy_name}' excluída!")
+                        st.rerun()
 
-        # Code Editor
-        st.session_state.strategy_code = st.text_area("CÓDIGO (Reference Only)", value=st.session_state.strategy_code, height=300)
+                st.markdown("<br>", unsafe_allow_html=True)
+        else:
+            st.info("📝 Nenhuma estratégia salva ainda. Crie uma nova!")
 
-        st.button("ANEXAR INDICADOR")
+        st.markdown("---")
+        if st.button("➕ NOVA ESTRATÉGIA", type="primary", use_container_width=True):
+            st.session_state.editing_strategy = True
+            st.session_state.editing_strategy_name = ""
+            st.session_state.strategy_code = """//@version=5
+indicator("Cruzamento EMA + Variação %", overlay=true)
+// ... (Código padrão)
+"""
+            st.rerun()
 
-        c_save, c_edit = st.columns(2)
-        with c_save:
-            if st.button("SALVAR", type="primary"):
-                # Salvar persistentemente
-                save_strategy(strategy_name, st.session_state.strategy_code)
-                st.session_state.active_strategy = strategy_name
-                st.session_state.current_strategy_name = strategy_name
-                st.success(f"✓ Estratégia '{strategy_name}' Salva com Sucesso!")
-                st.rerun()
-        with c_edit:
-            if st.button("EDITAR"):
-                st.session_state.current_strategy_name = strategy_name
+    # COLUNA DIREITA: Editor
+    with col_editor:
+        if st.session_state.editing_strategy:
+            st.markdown("### ✏️ EDITOR")
 
-    with col_details:
-        st.markdown("### LOGS / REGISTROS (Exemplo)")
-        st.info("Os logs reais serão exibidos no Dashboard após rodar o backtest.")
+            is_new = st.session_state.editing_strategy_name == ""
+            strategy_name = st.text_input(
+                "NOME DA ESTRATÉGIA *",
+                value=st.session_state.editing_strategy_name,
+                placeholder="Digite o nome da estratégia",
+                key="strategy_name_edit"
+            )
+
+            st.markdown("**ENTRAR LONG > (SINAL COMPRA)**")
+            st.markdown("**ENTRAR SHORT > (SINAL VENDA)**")
+
+            # Code Editor
+            strategy_code = st.text_area(
+                "CÓDIGO DA ESTRATÉGIA",
+                value=st.session_state.strategy_code,
+                height=300,
+                key="code_editor"
+            )
+
+            st.markdown("---")
+
+            # Botões de ação
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.button("💾 SALVAR", type="primary", use_container_width=True):
+                    if strategy_name.strip() == "":
+                        st.error("❌ Digite um nome para a estratégia!")
+                    else:
+                        save_strategy(strategy_name, strategy_code)
+                        st.session_state.active_strategy = strategy_name
+                        st.session_state.editing_strategy = False
+                        st.success(f"✅ Estratégia '{strategy_name}' salva com sucesso!")
+                        st.rerun()
+            with col_cancel:
+                if st.button("❌ CANCELAR", use_container_width=True):
+                    st.session_state.editing_strategy = False
+                    st.rerun()
+        else:
+            st.markdown("### 📖 INFORMAÇÕES")
+            st.info("""
+            **Como usar:**
+            1. Crie uma **NOVA ESTRATÉGIA** ou edite uma existente
+            2. **ATIVE** a estratégia que deseja testar
+            3. Volte ao **DASHBOARD** para executar o backtest
+
+            **Dica:** Apenas uma estratégia pode estar ativa por vez.
+            """)
 
 
 # ==============================================================================
@@ -195,6 +270,12 @@ elif st.session_state.page == 'dashboard':
         with c_bg_input:
             use_breakgain = st.checkbox("ATIVADO", value=False, key="breakgain_toggle")
 
+        # Taxa de Corretagem
+        c_comm_label, c_comm_input = st.columns([1, 1])
+        with c_comm_label: st.markdown("**TAXA CORRETAGEM**", unsafe_allow_html=True)
+        with c_comm_input:
+            commission_val = st.text_input("commission", value="0.1%", label_visibility="collapsed", help="Taxa de corretagem por operação (entrada + saída)")
+
         st.markdown("---")
         # Date Filter
         st.markdown("#### PERÍODO")
@@ -254,10 +335,12 @@ elif st.session_state.page == 'dashboard':
             sl_pct = float(sl_val.strip('%')) / 100
             tp_targets = [float(tp1_t.strip('%'))/100, float(tp2_t.strip('%'))/100, float(tp3_t.strip('%'))/100]
             tp_qtys = [float(tp1_q.strip('%'))/100, float(tp2_q.strip('%'))/100, float(tp3_q.strip('%'))/100]
+            commission_rate = float(commission_val.strip('%')) / 100
         except:
             sl_pct = 0.05
             tp_targets = [0.01]
             tp_qtys = [1.0]
+            commission_rate = 0.001  # 0.1% padrão
 
     # --- Chart Area (Left) ---
     with col_chart_area:
@@ -281,24 +364,16 @@ elif st.session_state.page == 'dashboard':
                 strategy = Strategy(df_resampled)
                 df_resampled = strategy.ema_crossover_variation(fast_length=5, slow_length=200)
 
-                # View Slice - Mostrar período selecionado inteligentemente
-                if len(df_resampled) > 2000:
-                    # Se tem muitos candles, mostrar os últimos 2000 OU a partir do primeiro sinal
-                    signals = df_resampled[df_resampled['signal'] != 0]
-                    if not signals.empty:
-                        # Pegar do primeiro sinal até o final, limitado a 2000 candles
-                        first_signal_idx = signals.index[0]
-                        df_from_signal = df_resampled.loc[first_signal_idx:]
-                        if len(df_from_signal) > 2000:
-                            st.info(f"📊 Exibindo últimos 2000 candles de {len(df_resampled)} (a partir do primeiro sinal)")
-                            df_view = df_from_signal.tail(2000)
-                        else:
-                            df_view = df_from_signal
-                    else:
-                        st.warning(f"⚠️ Exibindo últimos 2000 candles de {len(df_resampled)} (sem sinais detectados)")
-                        df_view = df_resampled.tail(2000)
+                # View Slice - Mostrar TODOS os candles do período selecionado
+                df_view = df_resampled
+
+                # Informar quantidade de candles sendo exibida
+                if len(df_view) > 5000:
+                    st.info(f"📊 Exibindo {len(df_view):,} candles. Para melhor performance, considere reduzir o período ou usar timeframe maior.")
+                elif len(df_view) > 2000:
+                    st.info(f"📊 Exibindo {len(df_view):,} candles no gráfico.")
                 else:
-                    df_view = df_resampled
+                    st.success(f"📊 Carregados {len(df_view):,} candles.")
                 
                 # Backtest
                 trades = pd.DataFrame()
@@ -320,7 +395,8 @@ elif st.session_state.page == 'dashboard':
                                     df_resampled,
                                     initial_balance=initial_balance,
                                     leverage=leverage,
-                                    entry_pct=entry_pct/100  # Converter de % para decimal
+                                    entry_pct=entry_pct/100,  # Converter de % para decimal
+                                    commission_rate=commission_rate  # Taxa de corretagem
                                 )
                                 trades = backtester.run(
                                     stop_loss_pct=sl_pct,
@@ -480,8 +556,8 @@ elif st.session_state.page == 'dashboard':
                     template='plotly_dark',
                     paper_bgcolor='#0a0a0a',
                     plot_bgcolor='#1a1a1a',
-                    margin=dict(l=10, r=10, t=40, b=10),
-                    height=600,
+                    margin=dict(l=10, r=60, t=40, b=10),
+                    height=700,  # Aumentado de 600 para 700px
                     xaxis_rangeslider_visible=False,
                     showlegend=False,
                     hovermode='closest',
@@ -493,14 +569,18 @@ elif st.session_state.page == 'dashboard':
                     xaxis=dict(
                         gridcolor='#2a2a2a',
                         showgrid=True,
-                        zeroline=False
+                        zeroline=False,
+                        type='date',  # Melhor formatação de datas
+                        rangeslider=dict(visible=False)
                     ),
                     yaxis=dict(
                         gridcolor='#2a2a2a',
                         showgrid=True,
                         zeroline=False,
-                        side='right'
-                    )
+                        side='right',
+                        fixedrange=False  # Permite zoom no eixo Y
+                    ),
+                    dragmode='zoom'  # Modo padrão de drag como zoom
                 )
 
                 # Adicionar legenda customizada sempre
@@ -548,6 +628,9 @@ elif st.session_state.page == 'dashboard':
 
                     winrate = (win_ops_count / total_ops_count * 100) if total_ops_count > 0 else 0
 
+                    # Calcular comissão total paga
+                    total_commission = backtester.total_commission_paid if backtester else 0
+
                     st.markdown(f"""
                     <div class="result-box">
                         <div style="margin-bottom: 5px;">
@@ -555,6 +638,9 @@ elif st.session_state.page == 'dashboard':
                         </div>
                         <div style="margin-bottom: 5px;">
                             <span class="result-label">GANHO/PREJUIZO:</span> <span class="result-value {'result-value-pos' if profit >=0 else 'result-value-neg'}">{profit:.2f}$ ({(profit/initial_balance)*100:.1f}%)</span>
+                        </div>
+                        <div style="margin-bottom: 5px;">
+                            <span class="result-label">COMISSÃO TOTAL:</span> <span class="result-value" style="color: #ffa726;">-{total_commission:.2f}$</span>
                         </div>
                         <div style="margin-bottom: 5px;">
                             <span class="result-label">WINRATE:</span> <span class="result-value result-value-pos">{winrate:.0f}%</span>
@@ -738,13 +824,15 @@ elif st.session_state.page == 'dashboard':
                             paper_bgcolor='#2b2b2b',
                             plot_bgcolor='#2b2b2b',
                             margin=dict(l=0, r=0, t=0, b=0),
-                            height=200,
+                            height=300,
                             xaxis=dict(showgrid=False, showticklabels=True, title="Operação"),
                             yaxis=dict(showgrid=True, gridcolor='#333', title="PnL ($)")
                         )
                         st.plotly_chart(fig_perf, use_container_width=True)
+                    else:
+                        st.info("📊 Execute um backtest para ver o gráfico de desempenho por operação")
 
-                    st.markdown("#### GRÁFICO P&L")
+                    st.markdown("#### GRÁFICO P&L ACUMULADO")
                     if not trades.empty:
                         # Simple PnL Area Chart
                         df_pnl = trades.copy()
@@ -762,12 +850,14 @@ elif st.session_state.page == 'dashboard':
                             paper_bgcolor='#2b2b2b',
                             plot_bgcolor='#2b2b2b',
                             margin=dict(l=0, r=0, t=0, b=0),
-                            height=200,
+                            height=300,
                             showlegend=False,
                             xaxis=dict(showgrid=False, showticklabels=False),
                             yaxis=dict(showgrid=False, showticklabels=False)
                         )
                         st.plotly_chart(fig_pnl, use_container_width=True)
+                    else:
+                        st.info("📈 Execute um backtest para ver o gráfico de P&L acumulado")
 
             else:
                 st.warning("Sem dados no período selecionado.")

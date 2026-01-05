@@ -166,12 +166,14 @@ class Strategy:
         return self.df
 
 class Backtester:
-    def __init__(self, df, initial_balance=1000, leverage=1, entry_pct=1.0):
+    def __init__(self, df, initial_balance=1000, leverage=1, entry_pct=1.0, commission_rate=0.0):
         self.df = df
         self.balance = initial_balance
         self.initial_balance = initial_balance
         self.leverage = leverage
         self.entry_pct = entry_pct  # % da banca a usar por operação
+        self.commission_rate = commission_rate  # Taxa de corretagem (ex: 0.001 = 0.1%)
+        self.total_commission_paid = 0  # Total de comissão paga
         self.trades = []
         self.equity_curve = [initial_balance]
 
@@ -214,7 +216,13 @@ class Backtester:
         # Usar % ENTRADA corretamente
         capital_to_use = self.balance * self.entry_pct
         size = (capital_to_use * self.leverage) / price
-        
+
+        # Calcular comissão de entrada
+        entry_value = size * price
+        entry_commission = entry_value * self.commission_rate
+        self.balance -= entry_commission  # Descontar comissão da banca
+        self.total_commission_paid += entry_commission
+
         if side == 'long':
             sl_price = price * (1 - sl_pct)
             tps = []
@@ -238,6 +246,7 @@ class Backtester:
             'tps': tps,
             'tp_quantities': tp_quantities,
             'pnl': 0,
+            'entry_commission': entry_commission,  # Guardar comissão de entrada
             'max_favorable_excursion': 0,  # Máximo floating favorável
             'max_adverse_excursion': 0,     # Máximo floating adverso
             'tps_hit_info': []  # Rastreia quais TPs foram acionados e como
@@ -279,16 +288,18 @@ class Backtester:
                     tp['hit'] = True
                     qty_pct = position['tp_quantities'][i] if i < len(position['tp_quantities']) else 0
 
-                    # Aplicar BREAKEVEN após primeiro TP
-                    if use_breakeven and i == 0:
+                    # Aplicar BREAKGAIN - Move SL para o TP atual (QUALQUER TP, incluindo TP1)
+                    # Garante que se o preço voltar, sai no último TP atingido
+                    if use_breakgain:
+                        current_tp_price = position['tps'][i]['price']
+                        position['sl'] = current_tp_price
+                        position['tps_hit_info'].append({'tp': i+1, 'type': 'BREAKGAIN'})
+
+                    # Aplicar BREAKEVEN após primeiro TP (só se BREAKGAIN não estiver ativo)
+                    elif use_breakeven and i == 0:
                         position['sl'] = position['entry_price']
                         position['tps_hit_info'].append({'tp': i+1, 'type': 'BREAKEVEN'})
 
-                    # Aplicar BREAKGAIN - Move SL para TP anterior
-                    elif use_breakgain and i > 0:
-                        prev_tp_price = position['tps'][i-1]['price']
-                        position['sl'] = prev_tp_price
-                        position['tps_hit_info'].append({'tp': i+1, 'type': 'BREAKGAIN'})
                     else:
                         position['tps_hit_info'].append({'tp': i+1, 'type': 'ACIONADO'})
 
@@ -309,13 +320,26 @@ class Backtester:
         position['size'] = 0
 
     def _register_trade(self, position, price, timestamp, reason, size_to_close):
-        # Calculate PnL
+        # Calculate PnL bruto
         if position['type'] == 'long':
-            pnl = (price - position['entry_price']) * size_to_close
+            pnl_gross = (price - position['entry_price']) * size_to_close
         else:
-            pnl = (position['entry_price'] - price) * size_to_close
+            pnl_gross = (position['entry_price'] - price) * size_to_close
 
-        self.balance += pnl
+        # Calcular comissão de saída
+        exit_value = size_to_close * price
+        exit_commission = exit_value * self.commission_rate
+
+        # Calcular comissão de entrada proporcional ao tamanho fechado
+        entry_commission_portion = position['entry_commission'] * (size_to_close / position['original_size'])
+
+        # PnL líquido = PnL bruto - comissão de entrada - comissão de saída
+        total_commission = entry_commission_portion + exit_commission
+        pnl_net = pnl_gross - total_commission
+
+        # Atualizar banca com PnL líquido
+        self.balance += pnl_net
+        self.total_commission_paid += exit_commission
 
         # Informações de TPs acionados para esta saída específica
         tps_status = {}
@@ -333,7 +357,9 @@ class Backtester:
             'entry_price': position['entry_price'],
             'exit_price': price,
             'size': size_to_close,
-            'pnl': pnl,
+            'pnl': pnl_net,  # PnL líquido (já com comissões descontadas)
+            'pnl_gross': pnl_gross,  # PnL bruto (sem comissões)
+            'commission': total_commission,  # Total de comissão desta operação
             'reason': reason,
             'balance': self.balance,
             'max_floating': position['max_favorable_excursion'],
