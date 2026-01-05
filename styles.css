@@ -1,0 +1,134 @@
+/* Main Background - Dark Slate */
+.stApp {
+    background-color: #0a0a0a;
+    color: #e0e0e0;
+    font-family: 'Arial', 'Roboto', 'Segoe UI', sans-serif;
+}
+
+/* --- Layout Containers --- */
+div[data-testid="stVerticalBlock"] {
+    gap: 0.5rem;
+}
+
+/* --- Sidebar / Right Panel (Simulated) --- */
+/* We will style specific columns in app.py with container classes, 
+   but here we define the 'Panel' look */
+.css-card {
+    background-color: #2b2b2b;
+    border: 1px solid #3e3e3e;
+    padding: 10px;
+    border-radius: 0px; /* Square */
+}
+
+/* --- Headers --- */
+h1, h2, h3, h4 {
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #ffffff;
+    margin-bottom: 5px;
+    font-weight: 900;
+}
+
+h1 {
+    font-size: 3rem;
+    text-shadow: 3px 3px 6px #000;
+}
+
+h2 {
+    font-size: 2rem;
+    text-shadow: 2px 2px 4px #000;
+}
+
+/* --- Inputs --- */
+/* Make inputs look like the mockup: Dark background, White text, Boxy */
+.stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"], .stDateInput input {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border: 1px solid #555 !important;
+    border-radius: 2px !important;
+    font-family: 'Consolas', monospace;
+    font-size: 14px;
+}
+
+/* Input Labels */
+label, .stMarkdown p {
+    color: #aaaaaa !important;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+/* --- Buttons --- */
+/* Green START Button */
+div.stButton > button {
+    background-color: #00c853;
+    color: white;
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-size: 32px;
+    letter-spacing: 3px;
+    width: 100%;
+    border: 3px solid #009624;
+    border-radius: 2px;
+    padding: 20px 0;
+    margin-top: 10px;
+    text-transform: uppercase;
+    transition: 0.2s;
+    font-weight: 900;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+}
+div.stButton > button:hover {
+    background-color: #00e676;
+    border-color: #69f0ae;
+    color: white;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0, 230, 118, 0.6);
+}
+
+/* Checkbox styling */
+div.stCheckbox > label {
+    font-size: 14px !important;
+    font-weight: bold !important;
+    color: #00e676 !important;
+}
+
+/* Secondary Buttons (Navigation/Edit) - You might need to target specific keys in app.py */
+/* We can't easily distinguish buttons by class in Streamlit without custom components, 
+   so we assume the main big actions are green. We might use `type="secondary"` for others if Streamlit supported it fully in open source styling. */
+
+/* --- Metrics / Results Area --- */
+div[data-testid="stMetricValue"] {
+    font-family: 'Consolas', monospace;
+    color: #00e676; 
+}
+
+/* --- Tables (Logs) --- */
+div[data-testid="stDataFrame"] {
+    background-color: #181818;
+    border: 1px solid #333;
+}
+
+/* --- Custom Classes (used via st.markdown HTML) --- */
+.game-header {
+    background-color: #2b2b2b;
+    padding: 10px;
+    text-align: center;
+    border-bottom: 2px solid #444;
+    margin-bottom: 10px;
+}
+
+.result-box {
+    background-color: #262626;
+    border: 1px solid #444;
+    padding: 15px;
+    font-family: 'Consolas', monospace;
+}
+.result-label { color: #888; font-size: 12px; }
+.result-value { color: #fff; font-size: 16px; font-weight: bold; }
+.result-value-pos { color: #00e676; }
+.result-value-neg { color: #ff5252; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; background: #121212; }
+::-webkit-scrollbar-thumb { background: #444; }
