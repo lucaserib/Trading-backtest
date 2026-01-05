@@ -54,6 +54,20 @@ if st.session_state.page == 'strategies':
     if 'editing_strategy_name' not in st.session_state:
         st.session_state.editing_strategy_name = ""
 
+    # Botão de Nova Estratégia no topo - SEMPRE VISÍVEL
+    col_nova_btn, col_spacer = st.columns([1, 3])
+    with col_nova_btn:
+        if st.button("➕ NOVA ESTRATÉGIA", type="primary", use_container_width=True, key="btn_nova_top"):
+            st.session_state.editing_strategy = True
+            st.session_state.editing_strategy_name = ""
+            st.session_state.strategy_code = """//@version=5
+indicator("Cruzamento EMA + Variação %", overlay=true)
+// ... (Código padrão)
+"""
+            st.rerun()
+
+    st.markdown("---")
+
     col_list, col_editor = st.columns([1, 1])
 
     # COLUNA ESQUERDA: Lista de Estratégias Salvas
@@ -105,17 +119,14 @@ if st.session_state.page == 'strategies':
 
                 st.markdown("<br>", unsafe_allow_html=True)
         else:
-            st.info("📝 Nenhuma estratégia salva ainda. Crie uma nova!")
-
-        st.markdown("---")
-        if st.button("➕ NOVA ESTRATÉGIA", type="primary", use_container_width=True):
-            st.session_state.editing_strategy = True
-            st.session_state.editing_strategy_name = ""
-            st.session_state.strategy_code = """//@version=5
-indicator("Cruzamento EMA + Variação %", overlay=true)
-// ... (Código padrão)
-"""
-            st.rerun()
+            st.warning("📝 Nenhuma estratégia salva ainda.")
+            st.markdown("""
+            <div style='background:#1a1a1a; padding:20px; border-radius:8px; border:2px dashed #00e676; text-align:center;'>
+                <p style='font-size:16px; color:#00e676; margin:0;'>
+                    👆 Clique no botão <strong>"➕ NOVA ESTRATÉGIA"</strong> acima para começar!
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
 
     # COLUNA DIREITA: Editor
     with col_editor:
